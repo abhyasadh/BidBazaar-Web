@@ -1,0 +1,41 @@
+{
+    "name": "bid-bazaar",
+    "version": "1.0.0",
+    "description": "bid-bazaar is the ultimate backend solution",
+    "main": "src/server.js",
+    "scripts": {
+        "setup": "npm install && npm update",
+        "start": "nodemon src/server.js"
+    },
+    "keywords": [
+        "express",
+        "backend",
+        "bid-bazaar"
+    ],
+    "license": "UNLICENSED",
+    "dependencies": {
+        "bcrypt": "^5.1.1",
+        "cloudinary": "^2.5.1",
+        "connect-multiparty": "^2.2.0",
+        "cookie-parser": "^1.4.4",
+        "cors": "^2.8.5",
+        "csurf": "^1.10.0",
+        "express": "^4.17.1",
+        "express-custom-error": "^1.8.4",
+        "express-mysql-session": "^3.0.3",
+        "express-session": "^1.18.1",
+        "file-type": "^20.1.0",
+        "has-keys": "^0.1.0",
+        "helmet": "^3.21.2",
+        "http-status": "^1.3.2",
+        "jsonwebtoken": "^9.0.2",
+        "mandatoryenv": "^1.1.1",
+        "module-alias": "^2.2.2",
+        "moment": "^2.30.1",
+        "morgan": "^1.9.1",
+        "mysql2": "^3.12.0",
+        "nodemon": "^3.1.9",
+        "rotating-file-stream": "^1.4.6",
+        "twilio": "^5.4.4"
+    }
+}
