@@ -7,6 +7,8 @@ router.route("/new").post(product.productPost).all(filter.methodNotAllowed);
 
 router.route("/all").get(product.getProducts).all(filter.methodNotAllowed);
 
+router.route("/own").get(product.getProducts).all(filter.methodNotAllowed);
+
 router
   .route("/get/:productId")
   .get(product.getProductById)

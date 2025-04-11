@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useState } from "react";
 import CustomTextField from "../../../components/CustomTextField";
 import { Call, Lock1 } from "iconsax-react";
 import { useUser } from "../../../contexts/UserContext";
@@ -7,38 +7,37 @@ import { toast } from "react-toastify";
 import { apis, useProtectedApi } from "../../../APIs/api";
 import { useAuth } from "../context/AuthContext";
 import CustomButton from "../../../components/CustomButton";
+import { useFunctions } from "../../../contexts/CommonFunctions";
+import { connectSocket } from "../../../APIs/socket";
 
 const Login = () => {
   const navigate = useNavigate();
+
   const { setUser } = useUser();
-  const { protectedPost } = useProtectedApi();
+
   const { updateFormState } = useAuth();
 
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loginErrorTrigger, setLoginErrorTrigger] = useState(0);
 
-  const validatePhone = useCallback((value) => {
-    if (!value) return "Phone number can't be empty!";
-    const regex =
-      /^([+]\d{1,3}\s?)?1?-?\.?\s?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}$/;
-    return regex.test(value) ? null : "Invalid phone number!";
-  }, []);
+  const { validatePhone, validateUserPassword } = useFunctions();
 
-  const validatePassword = useCallback((value) => {
-    if (!value) return "Password can't be empty!";
-    return null;
-  }, []);
+  const { protectedPost } = useProtectedApi();
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    if (validatePhone(phone) === null && validatePassword(password) === null) {
+    if (
+      validatePhone(phone) === null &&
+      validateUserPassword(password) === null
+    ) {
       try {
         const res = await protectedPost(apis.login, { phone, password });
         if (res.data.success === false) {
           toast.error(res.data.message);
         } else {
           setUser(res.data.user);
+          connectSocket(res.data.user.id);
           navigate("/", { replace: true });
         }
       } catch (err) {
@@ -46,6 +45,7 @@ const Login = () => {
         console.log(err.message);
       }
     } else {
+      console.log("Error");
       setLoginErrorTrigger((prev) => prev + 1);
     }
   };
@@ -79,7 +79,7 @@ const Login = () => {
             icon={<Lock1 size={15} color="grey" />}
             value={password}
             setValue={setPassword}
-            validator={validatePassword}
+            validator={validateUserPassword}
             type="password"
             errorTrigger={loginErrorTrigger}
             onSubmit={() => document.getElementById("loginButton")?.click()}

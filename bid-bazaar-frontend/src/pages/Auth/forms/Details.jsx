@@ -1,33 +1,16 @@
-import React, { useCallback, useState } from "react";
+import React, { useState } from "react";
 import BackButton from "../components/BackButton";
 import { useAuth } from "../context/AuthContext";
 import CustomTextField from "../../../components/CustomTextField";
 import { Sms, User } from "iconsax-react";
 import CustomButton from "../../../components/CustomButton";
+import { useFunctions } from "../../../contexts/CommonFunctions";
 
 const Details = () => {
   const [detailsErrorTrigger, setDetailsErrorTrigger] = useState(0);
   const { formValues, updateFormValues, updateFormState } = useAuth();
 
-  const validateFirstName = useCallback((value) => {
-    if (value.trim() === "") {
-      return "First name can't be empty!";
-    }
-    return null;
-  }, []);
-
-  const validateLastName = useCallback((value) => {
-    if (value.trim() === "") {
-      return "Last name can't be empty!";
-    }
-    return null;
-  }, []);
-
-  const validateEmail = useCallback((value) => {
-    if (!value) return "Email can't be empty!";
-    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return regex.test(value) ? null : "Invalid email format!";
-  }, []);
+  const { validateEmail, validateFirstName, validateLastName } = useFunctions();
 
   const handleProfilePictureChange = (e) => {
     const file = e.target.files[0];

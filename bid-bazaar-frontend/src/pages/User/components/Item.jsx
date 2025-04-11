@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Share, Flag } from "iconsax-react";
 import { useFunctions } from "../../../contexts/CommonFunctions";
+import useProductObserver from "../../../hooks/productObserver";
 import SaveButton from "./SaveButton";
 import { useShareReportModal } from "../context/ShareAndReportContext";
+import { getSocket } from "../../../APIs/socket";
 
 const Item = ({
   itemId,
@@ -15,9 +17,13 @@ const Item = ({
   previewMode = false,
 }) => {
   const navigate = useNavigate();
-  const { openReportModal, openShareModal } = useShareReportModal();
+  const socket = getSocket();
+
   const [showDropdown, setShowDropdown] = useState(false);
+  const { openReportModal, openShareModal } = useShareReportModal();
   const dropdownRef = useRef(null);
+
+  const ref = useProductObserver(itemId, socket);
 
   const handleClickOutside = (event) => {
     if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -35,6 +41,10 @@ const Item = ({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showDropdown]);
+
+  const [liveBidCount, setLiveBidCount] = useState(bidCount);
+  const [livePrice, setLivePrice] = useState(price);
+  const [liveEndsIn, setLiveEndsIn] = useState(endsIn);
 
   const style = {
     outerContainer: {
@@ -128,6 +138,23 @@ const Item = ({
 
   const { formatDuration, generateSlug } = useFunctions();
 
+  useEffect(() => {
+    const updateHandler = (data) => {
+
+      if (String(data.productId) === String(itemId)) {
+        setLiveBidCount(data.bids.length);
+        setLivePrice(data.bids[0].price);
+        setLiveEndsIn(new Date(data.bids[0].createdAt).getTime() + 21600000);
+      }
+    };
+
+    socket.on("bid-update", updateHandler);
+
+    return () => {
+      socket.off("bid-update", updateHandler);
+    };
+  }, [itemId, socket]);
+
   return (
     <div
       style={style.outerContainer}
@@ -137,18 +164,19 @@ const Item = ({
         document.title = "BidBazaar - " + title;
       }}
       className="item"
+      ref={ref}
     >
       <div style={style.imageContainer}>
         <img src={imageLink} alt={title} style={style.itemImage} />
         <div style={style.bidCountContainer}>
-          Bid Count: {bidCount.toLocaleString()}
+          Bid Count: {liveBidCount.toLocaleString()}
         </div>
-        <div style={style.timeContainer}>{formatDuration(endsIn)}</div>
+        <div style={style.timeContainer}>{formatDuration(liveEndsIn)}</div>
       </div>
       <div style={style.detailsContainer}>
         <div style={style.titleContainer}>
           <span style={style.title}>{title}</span>
-          <span style={style.price}>Rs. {price.toLocaleString()}</span>
+          <span style={style.price}>Rs. {livePrice.toLocaleString()}</span>
         </div>
         <div style={style.actionsContainer}>
           <div style={{ position: "relative" }}>

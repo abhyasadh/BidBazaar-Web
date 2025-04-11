@@ -9,8 +9,9 @@ const queries = [
         email varchar(255) NOT NULL,
         phone varchar(255) NOT NULL,
         password varchar(255) NOT NULL,
-        citizenshipImageURL varchar(255) DEFAULT NULL,
-        verified tinyint(1) DEFAULT '0',
+        citizenshipFront varchar(255) DEFAULT NULL,
+        citizenshipBack varchar(255) DEFAULT NULL,
+        verified enum('Verified', 'Not Verified', 'Pending', 'Rejected') NOT NULL DEFAULT 'Not Verified';
         failedLoginAttempts int DEFAULT '0',
         accountLockedUntil timestamp NULL DEFAULT NULL,
         isAdmin tinyint(1) DEFAULT '0',

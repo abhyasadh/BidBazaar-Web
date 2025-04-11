@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useCallback } from "react";
-import { useFilter } from "../../context/FilterContext";
 import CustomSelect from "../../../../components/CustomSelect";
 import { Award, Category } from "iconsax-react";
 import CustomTextArea from "../../../../components/CustomTextArea";
 import { usePost } from "../../context/PostContext";
 import CustomButton from "../../../../components/CustomButton";
 import CustomTable from "../../components/CustomTable";
+import { useItems } from "../../context/ItemsContext";
 
 const Stage2 = () => {
   const {
@@ -15,7 +15,7 @@ const Stage2 = () => {
     categorySpecifications,
     specificationForm,
   } = usePost();
-  const { categories } = useFilter();
+  const { categories } = useItems();
 
   const [categoryErrorTrigger, setCategoryErrorTrigger] = useState(0);
   const [specsErrorTrigger, setSpecsErrorTrigger] = useState(0);

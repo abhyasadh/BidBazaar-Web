@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { apis, useProtectedApi } from "../../../APIs/api";
 import { toast } from "react-toastify";
-import { useSaved } from "../context/SavedContext";
+import { useItems } from "../context/ItemsContext";
 
 const useThrottle = (func, delay) => {
   let lastCall = useRef(0);
@@ -18,9 +18,9 @@ const useThrottle = (func, delay) => {
 
 const SaveButton = ({ itemId, strokeWidth = 2, previewMode = false }) => {
   const { protectedPost } = useProtectedApi();
-  const { saved, unsave } = useSaved();
+  const { saved, unsave } = useItems();
   const [isSaved, setIsSaved] = useState(
-    saved.some((item) => item.id === itemId)
+    saved ? saved.some((item) => item.id === itemId) : false
   );
   const [loading, setLoading] = useState(false);
 

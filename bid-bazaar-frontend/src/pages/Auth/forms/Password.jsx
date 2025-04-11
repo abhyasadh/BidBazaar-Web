@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useState } from "react";
 import { apis, useProtectedApi } from "../../../APIs/api";
 import CustomTextField from "../../../components/CustomTextField";
 import { Lock1 } from "iconsax-react";
@@ -6,6 +6,7 @@ import BackButton from "../components/BackButton";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import CustomButton from "../../../components/CustomButton";
+import { useFunctions } from "../../../contexts/CommonFunctions";
 
 const Password = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -14,46 +15,16 @@ const Password = () => {
   const { formValues, updateFormValues, formState, updateFormState, reset } =
     useAuth();
 
-  const validateNewPassword = useCallback((value) => {
-    if (value === null || value === "") {
-      return "Password can't be empty!";
-    }
-    const requiredLength = 8;
-    const missingRequirements = [];
+  const { validatePassword } = useFunctions();
 
-    if (value.length < requiredLength) {
-      const missingLength = requiredLength - value.length;
-      missingRequirements.push(` ● At least ${missingLength} more characters`);
-    }
-
-    if (!/[A-Z]/.test(value)) {
-      missingRequirements.push(" ● An uppercase letter");
-    }
-    if (!/[a-z]/.test(value)) {
-      missingRequirements.push(" ● A lowercase letter");
-    }
-    if (!/[0-9]/.test(value)) {
-      missingRequirements.push(" ● A number");
-    }
-    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(value)) {
-      missingRequirements.push(" ● A special character");
-    }
-
-    if (missingRequirements.length === 0) {
-      return null;
-    } else {
-      return `The password is missing:\n${missingRequirements.join(",\n")}`;
-    }
-  }, []);
-
-  const validatePasswordMatch = useCallback((value) => {
-    if (!value) return "Confirm password can't be empty!";
+  const validateConfirmPassword = (value) => {
+    if (!value || value === "") return "Confirm password can't be empty!";
     return formValues.password === value ? null : "Passwords do not match!";
-  }, [formValues.password]);
+  };
 
   const handleSignup = async () => {
-    const passwordValidation = validateNewPassword(formValues.password);
-    const confirmPasswordValidation = validatePasswordMatch(confirmPassword);
+    const passwordValidation = validatePassword(formValues.password);
+    const confirmPasswordValidation = validateConfirmPassword(confirmPassword);
 
     if (passwordValidation === null && confirmPasswordValidation === null) {
       try {
@@ -88,8 +59,8 @@ const Password = () => {
   };
 
   const handlePasswordReset = async () => {
-    const passwordValidation = validateNewPassword(formValues.password);
-    const confirmPasswordValidation = validatePasswordMatch(confirmPassword);
+    const passwordValidation = validatePassword(formValues.password);
+    const confirmPasswordValidation = validateConfirmPassword(confirmPassword);
 
     if (passwordValidation === null && confirmPasswordValidation === null) {
       try {
@@ -134,7 +105,7 @@ const Password = () => {
             setValue={(value) => {
               updateFormValues("password", value);
             }}
-            validator={validateNewPassword}
+            validator={validatePassword}
             type="password"
             focusOnLoad={true}
             errorTrigger={passwordErrorTrigger}
@@ -146,7 +117,7 @@ const Password = () => {
             icon={<Lock1 size={16} color="grey" />}
             value={confirmPassword}
             setValue={setConfirmPassword}
-            validator={validatePasswordMatch}
+            validator={validateConfirmPassword}
             type="password"
             errorTrigger={passwordErrorTrigger}
             onSubmit={() => document.getElementById("passwordButton")?.click()}

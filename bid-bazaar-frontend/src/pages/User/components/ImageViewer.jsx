@@ -100,7 +100,7 @@ const ImageViewer = ({ images, activeImage, onChange }) => {
           src={images[activeImage]}
           alt="item"
           style={{
-            height: zoomedIn ? "100%" : "100vh",
+            height: zoomedIn ? "200%" : "100vh",
             objectFit: zoomedIn ? "cover" : "contain",
             cursor: zoomedIn ? "zoom-out" : "zoom-in",
           }}

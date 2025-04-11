@@ -18,6 +18,7 @@ const CustomTextField = ({
   onSubmit,
   errorTrigger,
   isTableElement = false,
+  style = {},
 }) => {
   const [error, setError] = useState(null);
   const [obscureText, setObscureText] = useState(type === "password");
@@ -53,6 +54,7 @@ const CustomTextField = ({
       flexDirection: "column",
       width: "100%",
       position: "relative",
+      ...style
     },
     label: {
       marginLeft: "10px",

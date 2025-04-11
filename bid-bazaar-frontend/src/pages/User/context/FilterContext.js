@@ -1,14 +1,17 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useProtectedApi, apis } from "../../../APIs/api";
-import { toast } from "react-toastify";
 
 const FilterContext = createContext();
 
 export const FilterProvider = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { protectedGet } = useProtectedApi();
 
   const getFiltersFromURL = () => {
     const params = new URLSearchParams(location.search);
@@ -30,21 +33,6 @@ export const FilterProvider = ({ children }) => {
       lowToHigh: params.get("sortBy") ?? (params.get("lowToHigh") || "true"),
     };
   };
-
-  const [categories, setCategories] = useState([]);
-
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const res = await protectedGet(apis.getCategories);
-        setCategories(res.data.categories);
-      } catch (error) {
-        console.log(error);
-        toast.error("Failed to fetch categories!");
-      }
-    };
-    fetchCategories();
-  }, [protectedGet]);
 
   const [filter, setFilter] = useState(getFiltersFromURL);
 
@@ -86,7 +74,7 @@ export const FilterProvider = ({ children }) => {
 
   return (
     <FilterContext.Provider
-      value={{ filter, setFilter, resetFilter, categories }}
+      value={{ filter, setFilter, resetFilter }}
     >
       {children}
     </FilterContext.Provider>

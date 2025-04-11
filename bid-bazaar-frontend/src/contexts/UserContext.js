@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { sessionApi } from "../APIs/api";
+import { connectSocket } from "../APIs/socket";
 
 const UserContext = createContext();
 
@@ -9,19 +10,20 @@ export const UserProvider = ({ children }) => {
 
   useEffect(() => {
     const fetchSession = async () => {
-        try {
-          const response = await sessionApi();
-          if (response.data.success) {
-            setUser(response.data.user);
-          }
-        } catch (error) {
-          console.log("No active session.");
-        } finally {
-          setLoading(false);
+      try {
+        const response = await sessionApi();
+        if (response.data.success) {
+          setUser(response.data.user);
+          connectSocket(response.data.user.id);
         }
-      };
-  
-      fetchSession();
+      } catch (error) {
+        console.log("No active session.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSession();
   }, []);
 
   return (

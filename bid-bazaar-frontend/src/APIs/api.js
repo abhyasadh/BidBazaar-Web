@@ -54,15 +54,9 @@ export const getCsrfTokenApi = () => Api.get('/api/csrf-token');
 export const useProtectedApi = () => {
   const { csrfToken } = useCsrf();
 
-  const protectedGet = useCallback(async (url, config = {}) => {
-    return await Api.get(url, {
-      ...config,
-      headers: {
-        ...config.headers,
-        'X-CSRF-Token': csrfToken,
-      },
-    });
-  }, [csrfToken]);
+  const protectedGet = useCallback(async (url) => {
+    return await Api.get(url);
+  }, []);
 
   const protectedPost = useCallback(async (url, data, config = {}) => {
     return await Api.post(url, data, {
@@ -108,10 +102,12 @@ export const apis = {
   sendOtp: '/api/user/send-otp',
   verifyOtp: '/api/user/verify-otp',
   resetPassword: '/api/user/update-password',
+  updateUser: '/api/user/update',
   logout: '/api/user/logout',
 
   productPost: '/api/product/new',
   getProducts: '/api/product/all',
+  getOwnProducts: '/api/product/own',
   getProductById: '/api/product/get',
   getFilteredProducts: '/api/product/filter',
   save: '/api/product/save',
@@ -119,6 +115,8 @@ export const apis = {
 
   getCategories: '/api/category/',
   getSpecifications: '/api/category/specifications',
+
+  placeBid: '/api/bid',
 
   contact: '/api/contact',
   report: '/api/report',

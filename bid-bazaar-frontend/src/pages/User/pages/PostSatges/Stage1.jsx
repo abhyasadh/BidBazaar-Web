@@ -3,19 +3,29 @@ import { usePost } from "../../context/PostContext";
 import { CloseCircle, Text } from "iconsax-react";
 import CustomTextField from "../../../../components/CustomTextField";
 import CustomButton from "../../../../components/CustomButton";
+import { useFunctions } from "../../../../contexts/CommonFunctions";
 
 const Stage1 = () => {
   const { updateFormStage, formValues, updateFormValues } = usePost();
+  const { validateImageUpload } = useFunctions();
 
   const handleImageUpload = useCallback((e) => {
     const files = [...e.target.files];
+
+    for (let i=0; i<Math.min(files.length, 5); i++){
+      if (validateImageUpload(files[i])!=null){
+        setImageError(validateImageUpload(files[i]));
+        return;
+      }
+    }
+
     const uploads = files.slice(0, 5 - formValues.images.length);
 
     updateFormValues("images", [...formValues.images, ...uploads]);
     setImageError("");
 
     e.target.value = null;
-  }, [formValues.images, updateFormValues]);
+  }, [formValues.images, updateFormValues, validateImageUpload]);
 
   const imagePreviews = useMemo(
     () =>

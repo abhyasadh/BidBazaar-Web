@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useState } from "react";
 import BackButton from "../components/BackButton";
 import { apis, useProtectedApi } from "../../../APIs/api";
 import { toast } from "react-toastify";
@@ -6,24 +6,15 @@ import { useAuth } from "../context/AuthContext";
 import CustomTextField from "../../../components/CustomTextField";
 import { Call } from "iconsax-react";
 import CustomButton from "../../../components/CustomButton";
+import { useFunctions } from "../../../contexts/CommonFunctions";
 
 const Phone = () => {
+
   const [phoneErrorTrigger, setPhoneErrorTrigger] = useState(0);
-  const { formValues, updateFormValues, formState, updateFormState } =
-    useAuth();
 
+  const { formValues, updateFormValues, formState, updateFormState } = useAuth();
   const { protectedPost } = useProtectedApi();
-
-  const validatePhone = useCallback((value) => {
-    if (!value) return "Phone number can't be empty!";
-    const regex =
-      /^([+]\d{1,3}\s?)?1?-?\.?\s?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}$/;
-    return regex.test(value) ? null : "Invalid phone number!";
-  }, []);
-
-  const updatePhone = (value) => {
-    updateFormValues("phone", value);
-  };
+  const { validatePhone } = useFunctions();
 
   const handleSendOtp = async () => {
     if (validatePhone(formValues.phone) != null){
@@ -65,7 +56,9 @@ const Phone = () => {
             hintText="Enter Your Phone Number..."
             icon={<Call size={16} color="grey" />}
             value={formValues.phone}
-            setValue={updatePhone}
+            setValue={(value) => {
+              updateFormValues("phone", value);
+            }}
             validator={validatePhone}
             type="tel"
             focusOnLoad={true}

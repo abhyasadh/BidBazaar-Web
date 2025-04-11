@@ -8,6 +8,7 @@ const {
   Images,
   ProductSpecifications,
   Saved,
+  Bids,
 } = require("../models/models");
 
 const productPost = async (req, res) => {
@@ -174,7 +175,13 @@ const getProducts = async (req, res) => {
                 WHERE b2.productId = b1.productId
             )
             LIMIT 1
-        ) AS highestBid ON product.id = highestBid.productId;`
+        ) AS highestBid ON product.id = highestBid.productId
+         WHERE product.userId ${req.url === "/all" ? "!=" : "="} ? AND (
+            highestBid.updatedAt IS NULL AND product.createdAt >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 24 HOUR)
+        ) OR (
+            highestBid.updatedAt >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 6 HOUR)
+        );`,
+      [req.session.user.id]
     );
 
     const products = rows.map((row) => ({
@@ -198,6 +205,12 @@ const getProducts = async (req, res) => {
 const getProductById = async (req, res) => {
   const productId = req.params.productId;
 
+  if (!productId || !Number.isInteger(Number(productId))) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Product ID is required!" });
+  }
+
   if (!req.session.viewedProducts?.includes(productId)) {
     req.session.viewedProducts = [
       ...(req.session.viewedProducts || []),
@@ -211,12 +224,6 @@ const getProductById = async (req, res) => {
       `,
       [productId]
     );
-  }
-
-  if (!productId || !Number.isInteger(Number(productId))) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Product ID is required!" });
   }
 
   try {
@@ -238,11 +245,7 @@ const getProductById = async (req, res) => {
             u.verified,
 
             COALESCE(img.imageURLs, '[]') AS images,
-            COALESCE(specs.specifications, '{}') AS specifications,
-
-            bidStats.bidCount,
-            highestBid.price AS highestBid,
-            highestBid.updatedAt AS highestBidUpdatedAt
+            COALESCE(specs.specifications, '{}') AS specifications
 
         FROM product p
 
@@ -265,23 +268,8 @@ const getProductById = async (req, res) => {
             GROUP BY ps.productId, s.categoryId
         ) AS specs ON p.id = specs.productId AND p.categoryId = specs.categoryId
 
-        LEFT JOIN (
-            SELECT productId, COUNT(id) AS bidCount
-            FROM bids
-            GROUP BY productId
-        ) AS bidStats ON p.id = bidStats.productId
-
-        LEFT JOIN (
-            SELECT b1.productId, b1.price, b1.updatedAt
-            FROM bids b1
-            WHERE b1.price = (
-                SELECT MAX(b2.price) FROM bids b2 WHERE b2.productId = b1.productId
-            )
-            ORDER BY b1.updatedAt DESC
-            LIMIT 1
-        ) AS highestBid ON p.id = highestBid.productId
-
-        WHERE p.id = ${productId};`
+        WHERE p.id = ?`,
+      [productId]
     );
 
     if (!product) {
@@ -289,6 +277,17 @@ const getProductById = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Product not found!" });
     }
+
+    const bids = await Bids.query(
+      `SELECT 
+          b.price, b.createdAt,
+          u.id, u.firstName, u.lastName
+       FROM bids b
+       LEFT JOIN user u ON b.userId = u.id
+       WHERE b.productId = ?
+       ORDER BY b.price DESC`,
+      [productId]
+    );
 
     const finalProduct = {
       id: product.productId,
@@ -303,15 +302,14 @@ const getProductById = async (req, res) => {
       user: {
         firstName: product.firstName,
         lastName: product.lastName,
-        profileImageUrl: product.profileImageUrl,
+        profileImageUrl: product.profileImageUrl + "?v=" + Date.now(),
         phone: product.phone,
         verified: product.verified,
       },
       specifications: JSON.parse(product.specifications),
-      bidCount: product.bidCount,
-      highestBid: product.highestBid,
-      highestBidUpdatedAt: product.highestBidUpdatedAt,
+      bids,
     };
+
     return res.status(200).json({ success: true, product: finalProduct });
   } catch (error) {
     console.log(error);
@@ -322,8 +320,6 @@ const getProductById = async (req, res) => {
 
 const filterProducts = async (req, res) => {
   const { categories, price, endsIn, sortBy, lowToHigh } = req.body;
-
-  console.log(req.body);
 
   let query = `
         SELECT 
@@ -360,7 +356,7 @@ const filterProducts = async (req, res) => {
             )
             LIMIT 1
         ) AS highestBid ON product.id = highestBid.productId
-        WHERE 1=1`;
+        HAVING remainingTime > 0`;
 
   const queryParams = [];
 
@@ -497,7 +493,12 @@ const getSaved = async (req, res) => {
             )
             LIMIT 1
         ) AS highestBid ON product.id = highestBid.productId
-        WHERE saved.userId = ?;`, [userId]
+        WHERE saved.userId = ? AND (
+            highestBid.updatedAt IS NULL AND product.createdAt >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 24 HOUR)
+        ) OR (
+            highestBid.updatedAt >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 6 HOUR)
+        );`,
+      [userId]
     );
 
     const products = rows.map((row) => ({

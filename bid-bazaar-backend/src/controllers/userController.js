@@ -22,6 +22,27 @@ function timeFromDatabase(date) {
   return new Date(date).getTime() - new Date().getTimezoneOffset() * 60 * 1000;
 }
 
+async function fileMimeInfo(image) {
+  const fileBuffer = fs.readFileSync(image.path);
+  const info = await (await fileType).fileTypeFromBuffer(fileBuffer);
+
+  return info;
+}
+
+function getPublicIdFromUrl(cloudinaryUrl) {
+  try {
+    const url = new URL(cloudinaryUrl);
+    const parts = url.pathname.split("/Profile%20Pictures/")[1];
+    const withoutExtension = parts.replace(/\.[^/.]+$/, "");
+    return withoutExtension.startsWith("/")
+      ? withoutExtension.slice(1)
+      : withoutExtension;
+  } catch (err) {
+    console.error("Invalid URL:", err);
+    return null;
+  }
+}
+
 const login = async (req, res) => {
   const { phone, password } = req.body;
 
@@ -90,9 +111,9 @@ const login = async (req, res) => {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      profilePicture: user.profileImageURL,
-      citizenshipImage: user.citizenshipImageURL,
-      isVerified: user.isVerified,
+      profilePicture: user.profileImageURL + "?v=" + Date.now(),
+      citizenshipImage: [user.citizenshipFront, user.citizenshipBack],
+      isVerified: user.verified,
       isAdmin: user.isAdmin,
     };
 
@@ -133,8 +154,7 @@ const register = async (req, res) => {
   }
   if (profileImage) {
     try {
-      const fileBuffer = fs.readFileSync(profileImage.path);
-      const mimeInfo = await (await fileType).fileTypeFromBuffer(fileBuffer);
+      const mimeInfo = await mime(profileImage);
 
       if (!mimeInfo || !mimeInfo.mime.startsWith("image/")) {
         validationErrors.push("Invalid file format. Please upload an image!");
@@ -322,10 +342,10 @@ const verifyOTP = async (req, res) => {
 };
 
 const updatePassword = async (req, res) => {
-  const { password } = req.body;
+  const { previousPassword, password } = req.body;
   const hashedPhone = req.session.resetPhone;
 
-  if (!hashedPhone) {
+  if (!previousPassword && !hashedPhone) {
     return res.json({
       success: false,
       message: "Session expired or invalid session!",
@@ -333,13 +353,33 @@ const updatePassword = async (req, res) => {
   }
 
   try {
-    const existingUser = await User.findBy("phone", hashedPhone);
+    let existingUser = null;
+
+    if (hashedPhone) {
+      existingUser = await User.findBy("phone", hashedPhone);
+    } else if (previousPassword) {
+      existingUser = await User.findBy("id", req.session.user.id);
+    }
+
     if (!existingUser) {
       return res.json({
         success: false,
         message: "User not found!",
       });
     } else {
+      if (previousPassword) {
+        const result = await bcrypt.compare(
+          previousPassword,
+          existingUser[0].password
+        );
+        if (!result) {
+          return res.json({
+            success: false,
+            message: "Incorrect Password!",
+          });
+        }
+      }
+
       let validationErrors = [];
 
       if (!/[A-Z]/.test(password)) {
@@ -376,6 +416,10 @@ const updatePassword = async (req, res) => {
       user.password = encryptedPassword;
       await User.update(user.id, user);
 
+      if (hashedPhone) {
+        req.session.resetPhone = null;
+      }
+
       return res.status(200).json({
         success: true,
         message: "Password changed successfully!",
@@ -396,7 +440,8 @@ const update = async (req, res) => {
     });
   }
 
-  const user = User.findById(userId);
+  const user = await User.findById(userId);
+
   if (!user) {
     return res.json({
       success: false,
@@ -404,17 +449,12 @@ const update = async (req, res) => {
     });
   }
 
-  const {
-    firstName,
-    lastName,
-    profileImage,
-    email,
-    citizenshipImage,
-    verified,
-    accountLockedUntil,
-  } = req.body;
+  const { firstName, lastName, email, verified, accountLockedUntil } = req.body;
+  const { profileImage, citizenshipFront, citizenshipBack } = req.files;
+
   let profileImageURL = null;
-  let citizenshipImageURL = null;
+  let citizenshipFrontURL = null;
+  let citizenshipBackURL = null;
 
   let validationErrors = [];
 
@@ -428,38 +468,54 @@ const update = async (req, res) => {
     validationErrors.push("Invalid email format!");
   }
   if (profileImage) {
-    const fileBuffer = fs.readFileSync(profileImage.path);
-    const mimeInfo = await fileType.fromBuffer(fileBuffer);
+    const mimeInfo = await fileMimeInfo(profileImage);
 
     if (!mimeInfo || !mimeInfo.mime.startsWith("image/")) {
       validationErrors.push("Invalid file format. Please upload an image!");
     } else {
-      const uploadedImage = await cloudinary.v2.uploader.upload(
-        profileImage.path,
-        {
-          folder: "Profile Pictures",
-          crop: "scale",
-        }
-      );
-      profileImageURL = uploadedImage.secure_url;
+      try {
+        const uploadedImage = await cloudinary.v2.uploader.upload(
+          profileImage.path,
+          {
+            public_id: getPublicIdFromUrl(user.profileImageURL),
+            overwrite: true,
+            invalidate: true,
+            resource_type: "image",
+            folder: "Profile Pictures",
+          }
+        );
+        profileImageURL = uploadedImage.secure_url;
+      } catch (e) {
+        console.log(e);
+      }
     }
   }
-  if (citizenshipImage) {
-    const fileBuffer = fs.readFileSync(citizenshipImage.path);
-    const mimeInfo = await fileType.fromBuffer(fileBuffer);
+  if (citizenshipFront && citizenshipBack) {
+    const citizenship = [citizenshipFront, citizenshipBack];
 
-    if (!mimeInfo || !mimeInfo.mime.startsWith("image/")) {
-      validationErrors.push("Invalid file format. Please upload an image!");
-    } else {
-      const uploadedImage = await cloudinary.v2.uploader.upload(
-        profileImage.path,
-        {
-          folder: "Citizenship",
-          crop: "scale",
-        }
-      );
-      citizenshipImageURL = uploadedImage.secure_url;
+    for (const image of citizenship) {
+      const fileBuffer = fs.readFileSync(image.path);
+      const mimeInfo = await (await fileType).fileTypeFromBuffer(fileBuffer);
+
+      if (!mimeInfo || !mimeInfo.mime.startsWith("image/")) {
+        return res.json({ success: false, message: "Invalid file format!" });
+      }
     }
+
+    const uploadPromises = citizenship.map(async (image) => {
+      const uploadedImage = await cloudinary.v2.uploader.upload(image.path, {
+        folder: "Citizenship",
+        crop: "scale",
+      });
+      return uploadedImage.secure_url;
+    });
+
+    imagesUrl = await Promise.all(uploadPromises);
+
+    citizenshipFrontURL = imagesUrl[0];
+    citizenshipBackURL = imagesUrl[1];
+
+    user.verified = "Pending";
   }
 
   if (validationErrors.length > 0)
@@ -469,16 +525,36 @@ const update = async (req, res) => {
   user.lastName = lastName ?? user.lastName;
   user.email = email ?? user.email;
   user.profileImageURL = profileImageURL ?? user.profileImageURL;
-  user.citizenshipImageURL = citizenshipImageURL ?? user.citizenshipImageURL;
+  user.citizenshipFront = citizenshipFrontURL ?? user.citizenshipFront;
+  user.citizenshipBack = citizenshipBackURL ?? user.citizenshipBack;
   user.verified = verified ?? user.verified;
   user.accountLockedUntil = accountLockedUntil ?? user.accountLockedUntil;
 
   try {
-    User.update(user.id, user);
-    res.status(200).json({
-      success: true,
-      message: "Details updated!",
-    });
+    const result = await User.update(user.id, user);
+    if (result) {
+      const newUser = {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        profilePicture: user.profileImageURL + "?v=" + Date.now(),
+        citizenshipImage: [user.citizenshipFront, user.citizenshipBack],
+        isVerified: user.verified,
+        isAdmin: user.isAdmin,
+      };
+      req.session.user = newUser;
+      res.status(200).json({
+        success: true,
+        message: "Details updated!",
+        user: newUser,
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: "Failed to update details!",
+      });
+    }
   } catch (error) {
     console.log(error);
     res.status(500).json(error);

@@ -4,11 +4,13 @@ import { apis, useProtectedApi } from "../../../APIs/api";
 import { toast } from "react-toastify";
 import Item from "../components/Item";
 import { useLocation } from "react-router-dom";
-import { useSaved } from "../context/SavedContext";
+import { useItems } from "../context/ItemsContext";
+import ItemLoader from "../components/ItemLoader";
+import Empty from "../components/Empty";
 
 const FilteredItems = () => {
   const location = useLocation();
-  const { saved } = useSaved();
+  const { saved } = useItems();
 
   const { filter, resetFilter, categories } = useFilter();
   const filters = [];
@@ -73,12 +75,14 @@ const FilteredItems = () => {
     fetchProducts();
   }, [protectedPost, filter]);
 
-  useEffect(()=>{
+  useEffect(() => {
     const currentPage = location.pathname;
     if (currentPage.startsWith("/saved") && allProducts) {
-      setFilteredProducts(allProducts.filter((product) =>
-        saved.some((item) => item.id === product.id)
-      ));
+      setFilteredProducts(
+        allProducts.filter((product) =>
+          saved.some((item) => item.id === product.id)
+        )
+      );
     } else {
       setFilteredProducts(allProducts);
     }
@@ -141,25 +145,36 @@ const FilteredItems = () => {
         </div>
       </div>
       <h2 className="label">Filtered Items</h2>
-      <div className="items-container">
-        {filteredProducts &&
-          filteredProducts.map((product) => (
-            <Item
-              key={product.id}
-              itemId={product.id}
-              imageLink={product.image}
-              title={product.name}
-              price={product.highestBid ?? product.price}
-              bidCount={product.bidCount ?? 0}
-              endsIn={
-                product.highestBidUpdatedAt
-                  ? new Date(product.highestBidUpdatedAt).getTime() + 21600000
-                  : new Date(product.createdAt).getTime() + 21600000 * 4
-              }
-            />
-          ))}
-        ;
-      </div>
+      {filteredProducts && filteredProducts.length === 0 ? (
+        <Empty height={"100%"}/>
+      ) : (
+        <div className="items-container">
+          {filteredProducts === null ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} style={{ width: "100%", aspectRatio: "1" }}>
+                <ItemLoader />
+              </div>
+            ))
+          ) : (
+            filteredProducts.map((product) => (
+              <Item
+                key={product.id}
+                itemId={product.id}
+                imageLink={product.image}
+                title={product.name}
+                price={product.highestBid ?? product.price}
+                bidCount={product.bidCount ?? 0}
+                endsIn={
+                  product.highestBidUpdatedAt
+                    ? new Date(product.highestBidUpdatedAt).getTime() + 21600000
+                    : new Date(product.createdAt).getTime() + 21600000 * 4
+                }
+              />
+            ))
+          )}
+          ;
+        </div>
+      )}
     </div>
   );
 };

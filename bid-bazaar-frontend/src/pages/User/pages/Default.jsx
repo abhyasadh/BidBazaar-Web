@@ -1,29 +1,41 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Item from "../components/Item";
-import { apis, useProtectedApi } from "../../../APIs/api";
-import { toast } from "react-toastify";
+import ContentLoader from "react-content-loader";
+import ItemLoader from "../components/ItemLoader";
+import Empty from "../components/Empty";
+import { useItems } from "../context/ItemsContext";
 
 const Default = () => {
-  const [products, setProducts] = useState(null);
-  const { protectedGet } = useProtectedApi();
-
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const res = await protectedGet(apis.getProducts);
-        setProducts(res.data.products);
-      } catch (error) {
-        toast.error("Failed to fetch categories!");
-      }
-    };
-    fetchProducts();
-  }, [protectedGet]);
+  const { products } = useItems();
 
   return (
     <>
-      <h2 className="label">Trending</h2>
+      {products === null ? (
+        <div style={{ width: "100px", height: "46px" }}>
+          <ContentLoader
+            speed={1.5}
+            width="150"
+            height="36"
+            viewBox="0 0 150 36"
+            backgroundColor="var(--color-scheme-primary)"
+            foregroundColor="var(--color-scheme-secondary)"
+          >
+            <rect x="0" y="0" rx="10" ry="10" width="150" height="32" />
+          </ContentLoader>
+        </div>
+      ) : products.length === 0 ? (
+        <Empty height={"calc(100vh - 122px)"}/>
+      ) : (
+        products && products.length > 0 && <h2 className="label">Trending</h2>
+      )}
       <div className="items-container">
-        {products &&
+        {products === null ? (
+          Array.from({ length: 24 }).map((_, index) => (
+            <div key={index} style={{ width: "100%", aspectRatio: "1" }}>
+              <ItemLoader key={index} />
+            </div>
+          ))
+        ) : (
           products.map((product) => (
             <Item
               key={product.id}
@@ -38,8 +50,8 @@ const Default = () => {
                   : new Date(product.createdAt).getTime() + 21600000 * 4
               }
             />
-          ))}
-        ;
+          ))
+        )}
       </div>
     </>
   );
