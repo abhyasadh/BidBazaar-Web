@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from "react";
 import {
   ArrowRight2,
   ArrowLeft2,
@@ -7,11 +8,9 @@ import {
   Share,
   Flag,
 } from "iconsax-react";
-import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { apis, useProtectedApi } from "../../../APIs/api";
 import { toast } from "react-toastify";
-import { useFunctions } from "../../../contexts/CommonFunctions";
 import SaveButton from "../components/SaveButton";
 import ImageViewer from "../components/ImageViewer";
 import { useShareReportModal } from "../context/ShareAndReportContext";
@@ -21,11 +20,11 @@ import ContentLoader from "react-content-loader";
 import { useUser } from "../../../contexts/UserContext";
 import Calculator from "../components/Calculator";
 import { getSocket } from "../../../APIs/socket";
+import TimeDisplay from "../components/TimeDisplay";
 
 const ItemDetails = () => {
   const { protectedGet } = useProtectedApi();
   const { openReportModal, openShareModal } = useShareReportModal();
-  const { formatDuration } = useFunctions();
   const { user } = useUser();
   const { itemId } = useParams();
 
@@ -353,12 +352,15 @@ const ItemDetails = () => {
                       Bid Count: {product.bids.length}
                     </span>
                     <span className="detail">
-                      {formatDuration(
-                        product.bids.length > 0
-                          ? new Date(product.bids[0].createdAt).getTime() +
+                      <TimeDisplay
+                        timestamp={
+                          product.highestBidUpdatedAt
+                            ? new Date(product.highestBidUpdatedAt).getTime() +
                               21600000
-                          : new Date(product.createdAt).getTime() + 21600000 * 4
-                      )}
+                            : new Date(product.createdAt).getTime() +
+                              21600000 * 4
+                        }
+                      />
                     </span>
                   </>
                 )}
@@ -649,7 +651,8 @@ const ItemDetails = () => {
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "space-between",
-                          marginBottom: index !== product.bids.length - 1 && "10px",
+                          marginBottom:
+                            index !== product.bids.length - 1 && "10px",
                           width: "100%",
                           color: "var(--text-color)",
                           fontSize: index === 0 ? "18px" : "14px",

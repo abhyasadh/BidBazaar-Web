@@ -10,9 +10,9 @@ import Empty from "../components/Empty";
 
 const FilteredItems = () => {
   const location = useLocation();
-  const { saved } = useItems();
+  const { saved, categories } = useItems();
 
-  const { filter, resetFilter, categories } = useFilter();
+  const { filter, resetFilter } = useFilter();
   const filters = [];
 
   if (filter.categories.length && !filter.categories.includes("All")) {

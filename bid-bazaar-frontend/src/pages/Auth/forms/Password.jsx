@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { apis, useProtectedApi } from "../../../APIs/api";
 import CustomTextField from "../../../components/CustomTextField";
 import { Lock1 } from "iconsax-react";
@@ -17,10 +17,10 @@ const Password = () => {
 
   const { validatePassword } = useFunctions();
 
-  const validateConfirmPassword = (value) => {
+  const validateConfirmPassword = useCallback((value) => {
     if (!value || value === "") return "Confirm password can't be empty!";
     return formValues.password === value ? null : "Passwords do not match!";
-  };
+  }, [formValues.password]);
 
   const handleSignup = async () => {
     const passwordValidation = validatePassword(formValues.password);

@@ -73,10 +73,6 @@ app.use(
 );
 app.use(csrfProtection);
 
-app.get("/api/csrf-token", (req, res) => {
-  res.json({ csrfToken: req.csrfToken() });
-});
-
 //App Routes
 app.use("/api/user", require("./routes/userRoutes.js"));
 app.use("/api/category", require("./routes/categoryRoutes.js"));

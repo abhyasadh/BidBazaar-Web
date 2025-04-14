@@ -1,5 +1,5 @@
 import axios from "axios";
-import { useCsrf } from "../contexts/CsrfContext";
+import { useUser } from "../contexts/UserContext";
 import { toast } from "react-toastify";
 import { useCallback } from "react";
 
@@ -49,10 +49,9 @@ Api.interceptors.response.use(
 );
 
 export const sessionApi = () => Api.get('/api/user/session');
-export const getCsrfTokenApi = () => Api.get('/api/csrf-token');
 
 export const useProtectedApi = () => {
-  const { csrfToken } = useCsrf();
+  const { csrfToken } = useUser();
 
   const protectedGet = useCallback(async (url) => {
     return await Api.get(url);

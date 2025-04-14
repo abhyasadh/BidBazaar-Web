@@ -1,20 +1,7 @@
-import { createContext, useContext } from "react";
+import { createContext, useCallback, useContext } from "react";
 
 const FunctionsContext = createContext();
 export const FunctionsProvider = ({ children }) => {
-  const formatDuration = (timestamp) => {
-    const now = new Date();
-    const timestampDate = new Date(timestamp);
-    const endsInFuture = now < timestampDate;
-    const difference = endsInFuture ? timestampDate - now : now - timestampDate;
-    const days = Math.floor(difference / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
-    const minutes = Math.floor((difference / (1000 * 60)) % 60);
-
-    return `${endsInFuture ? "Ends In:" : "Ended:"} ${
-      days !== 0 ? days + "D" : ""
-    } ${hours}H ${minutes}M`;
-  };
 
   const generateSlug = (title) => {
     return title
@@ -25,41 +12,41 @@ export const FunctionsProvider = ({ children }) => {
       .replace(/-+/g, "-");
   };
 
-  const validatePhone = (value) => {
+  const validatePhone = useCallback((value) => {
     if (value.trim() === "") return "Phone number can't be empty!";
     const regex =
       /^([+]\d{1,3}\s?)?1?-?\.?\s?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}$/;
     return regex.test(value) ? null : "Invalid phone number!";
-  };
+  }, []);
 
-  const validateEmail = (value) => {
+  const validateEmail = useCallback((value) => {
     if (value.trim() === "") return "Email can't be empty!";
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return regex.test(value) ? null : "Invalid email format!";
-  };
+  }, []);
 
-  const validateFirstName = (value) => {
+  const validateFirstName = useCallback((value) => {
     if (value.trim() === "") {
       return "First name can't be empty!";
     }
     return null;
-  };
+  }, []);
 
-  const validateLastName = (value) => {
+  const validateLastName = useCallback((value) => {
     if (value.trim() === "") {
       return "Last name can't be empty!";
     }
     return null;
-  };
+  }, []);
 
-  const validateUserPassword = (value) => {
+  const validateUserPassword = useCallback((value) => {
     if (value === "") {
       return "Password can't be empty!";
     }
     return null;
-  };
+  }, []);
 
-  const validatePassword = (value) => {
+  const validatePassword = useCallback((value) => {
     if (value === null || value === "") {
       return "Password can't be empty!";
     }
@@ -89,9 +76,9 @@ export const FunctionsProvider = ({ children }) => {
     } else {
       return `The password is missing:\n${missingRequirements.join(",\n")}`;
     }
-  };
+  }, []);
 
-  const validateImageUpload = (value) => {
+  const validateImageUpload = useCallback((value) => {
     const allowedTypes = ["image/jpeg", "image/png", "image/jpg"];
 
     if (!allowedTypes.includes(value.type)) {
@@ -101,12 +88,11 @@ export const FunctionsProvider = ({ children }) => {
     }
 
     return null;
-  };
+  }, []);
 
   return (
     <FunctionsContext.Provider
       value={{
-        formatDuration,
         generateSlug,
         validatePhone,
         validateEmail,

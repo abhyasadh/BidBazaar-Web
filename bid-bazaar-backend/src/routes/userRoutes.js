@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const user = require("../controllers/userController");
 const filter = require('../util/methodFilter');
+const { requiresUser } = require('../util/requiresUser');
 
 router.route('/session')
     .get(user.getSession)
@@ -27,11 +28,11 @@ router.route('/update-password')
     .put(user.updatePassword)
     .all(filter.methodNotAllowed);
 
-router.route('/update')
+router.route('/update', requiresUser)
     .put(user.update)
     .all(filter.methodNotAllowed);
 
-router.route('/logout')
+router.route('/logout', requiresUser)
     .post(user.logout)
     .all(filter.methodNotAllowed);
 

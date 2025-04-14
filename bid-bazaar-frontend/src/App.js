@@ -7,7 +7,6 @@ import {
 import { ToastContainer } from "react-toastify";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { UserProvider, useUser } from "./contexts/UserContext";
-import { CsrfProvider } from "./contexts/CsrfContext";
 import { AuthProvider } from "./pages/Auth/context/AuthContext";
 import { FilterProvider } from "./pages/User/context/FilterContext";
 import { PostProvider } from "./pages/User/context/PostContext";
@@ -120,16 +119,14 @@ function AppContent() {
 function App() {
   return (
     <UserProvider>
-      <CsrfProvider>
-        <ThemeProvider>
-          <ItemsProvider>
-            <Router>
-              <ToastContainer />
-              <AppContent />
-            </Router>
-          </ItemsProvider>
-        </ThemeProvider>
-      </CsrfProvider>
+      <ThemeProvider>
+        <ItemsProvider>
+          <Router>
+            <ToastContainer />
+            <AppContent />
+          </Router>
+        </ItemsProvider>
+      </ThemeProvider>
     </UserProvider>
   );
 }

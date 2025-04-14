@@ -1,12 +1,9 @@
-const { Contact, Reports } = require("../models/models");
+const { Contact } = require("../services/contactServices");
+const { Reports } = require("../services/reportServices");
 
 const contact = async (req, res) => {
   const { subject, message } = req.body;
   const user = req.session.user.id;
-
-  if (!user) {
-    return res.status(401).json({ error: "Unauthorized!" });
-  }
 
   if (!subject || !message) {
     return res.json({

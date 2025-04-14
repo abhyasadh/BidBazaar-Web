@@ -179,12 +179,10 @@ const Profile = () => {
                     htmlFor="profile-picture-input"
                     className="profile-picture-label"
                   >
-                    {formValues.profileImage ? (
+                    {formValues.profileImage && (!typeof formValues.profileImage === "string" || !formValues.profileImage.startsWith("null")) ? (
                       <img
                         src={
-                          typeof formValues.profileImage === "string"
-                            ? formValues.profileImage
-                            : URL.createObjectURL(formValues.profileImage)
+                          URL.createObjectURL(formValues.profileImage)
                         }
                         alt="Profile"
                         className="profile-picture-preview"
@@ -197,7 +195,7 @@ const Profile = () => {
                         }}
                       />
                     ) : (
-                      <div style={{ width: "180px", height: "180px" }}></div>
+                      <div style={{ width: "180px", height: "180px", cursor: "pointer" }}></div>
                     )}
                   </label>
                 </>

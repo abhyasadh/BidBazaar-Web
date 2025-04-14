@@ -11,42 +11,46 @@ const ListedAuctions = () => {
   const { formatDuration } = useFunctions();
   const { protectedGet } = useProtectedApi();
 
-  const [active, setActive] = useState(null);
-  const [ended, setEnded] = useState(null);
+  const [products, setProducts] = useState(null);
+  const [active, setActive] = useState([]);
+  const [ended, setEnded] = useState([]);
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const res = await protectedGet(apis.getOwnProducts);
-        const products = res.data.products;
-
-        const newActive = [];
-        const newEnded = [];
-
-        products.forEach((product) => {
-          const time = formatDuration(
-            product.highestBidUpdatedAt
-              ? new Date(product.highestBidUpdatedAt).getTime() + 21600000
-              : new Date(product.createdAt).getTime() + 21600000 * 4
-          );
-
-          if (time.startsWith("Ended")) {
-            newEnded.push(product);
-          } else {
-            newActive.push(product);
-          }
-        });
-        setActive(newActive);
-        setEnded(newEnded);
+        const allProducts = res.data.products;
+        setProducts(allProducts);
       } catch (error) {
         toast.error("Failed to fetch your listed auctions!");
       }
     };
 
     fetchProducts();
-  }, [protectedGet, formatDuration]);
+  }, [protectedGet]);
 
-  if (active === null || ended === null) {
+  useEffect(() => {
+    const newActive = [];
+    const newEnded = [];
+
+    products && products.forEach((product) => {
+      const time = formatDuration(
+        product.highestBidUpdatedAt
+          ? new Date(product.highestBidUpdatedAt).getTime() + 21600000
+          : new Date(product.createdAt).getTime() + 21600000 * 4
+      );
+
+      if (time.startsWith("Ended")) {
+        newEnded.push(product);
+      } else {
+        newActive.push(product);
+      }
+    });
+    setActive(newActive);
+    setEnded(newEnded);
+  }, [formatDuration, products]);
+
+  if (products === null) {
     return (
       <>
         <h1 className="label">Listed Auctions</h1>
@@ -73,7 +77,7 @@ const ListedAuctions = () => {
     );
   }
 
-  if (active.length === 0 && ended.length === 0) {
+  if (products.length === 0) {
     return <Empty height={"calc(100vh - 50px)"} />;
   }
 

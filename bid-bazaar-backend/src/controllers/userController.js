@@ -1,4 +1,5 @@
-const { User, OTP } = require("../models/models.js");
+const { User } = require("../services/userServices");
+const { OTP } = require("../services/otpServices");
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const accountSid = process.env.TWILIO_SID;
@@ -6,6 +7,7 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const client = require("twilio")(accountSid, authToken);
 const cloudinary = require("cloudinary");
 const fs = require("fs");
+const { token } = require("morgan");
 const fileType = import("file-type");
 
 const OTP_EXPIRY_TIME = 60 * 1000;
@@ -242,7 +244,7 @@ const sendOTP = async (req, res) => {
 
   try {
     const hashedPhone = hash(phone);
-    const existingUser = await User.findBy("phone", hashedPhone);
+    const existingUser = await User.findBy("phone", hashedPhone, ["id"]);
     if (!existingUser.length >= 1 && type === "reset") {
       return res.json({
         success: false,
@@ -433,13 +435,6 @@ const updatePassword = async (req, res) => {
 
 const update = async (req, res) => {
   const userId = req.session.user.id;
-  if (!userId) {
-    return res.json({
-      success: false,
-      message: "Session Expired. Please Login Again!",
-    });
-  }
-
   const user = await User.findById(userId);
 
   if (!user) {
@@ -577,10 +572,11 @@ const logout = async (req, res) => {
 };
 
 const getSession = (req, res) => {
+  const csrfToken = req.csrfToken();
   if (req.session.user) {
-    return res.status(200).json({ success: true, user: req.session.user });
+    return res.status(200).json({ success: true, user: req.session.user, csrfToken: csrfToken });
   }
-  return res.status(200).json({ success: false, message: "No active session" });
+  return res.status(200).json({ success: false, message: "No active session", csrfToken: csrfToken });
 };
 
 module.exports = {

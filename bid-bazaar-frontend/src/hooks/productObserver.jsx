@@ -7,8 +7,6 @@ function useProductObserver(productId, socket) {
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) {
         socket.emit("join-room", productId);
-      } else {
-        socket.emit("leave-room", productId);
       }
     });
 

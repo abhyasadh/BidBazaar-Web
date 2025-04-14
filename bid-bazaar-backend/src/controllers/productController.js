@@ -1,15 +1,11 @@
 const fs = require("fs");
 const { specificationList } = require("./categoryController");
-require("../models/models");
 const fileType = import("file-type");
 const cloudinary = require("cloudinary");
-const {
-  Product,
-  Images,
-  ProductSpecifications,
-  Saved,
-  Bids,
-} = require("../models/models");
+const { Product } = require("../services/productServices");
+const { Images } = require("../services/imageServices");
+const { ProductSpecifications } = require("../services/productSpecificationServices");
+const { Saved } = require("../services/savedServices");
 
 const productPost = async (req, res) => {
   const {
@@ -150,50 +146,7 @@ const productPost = async (req, res) => {
 
 const getProducts = async (req, res) => {
   try {
-    const rows = await Product.query(
-      `SELECT 
-            product.id AS productId,
-            product.name,
-            product.price as initPrice,
-            product.createdAt,
-            (SELECT imageURL FROM images WHERE images.productId = product.id LIMIT 1) AS imageURL,
-            bidStats.bidCount,
-            highestBid.price AS highestBid,
-            highestBid.updatedAt AS highestBidUpdatedAt
-        FROM product
-        LEFT JOIN (
-            SELECT productId, COUNT(id) AS bidCount
-            FROM bids
-            GROUP BY productId
-        ) AS bidStats ON product.id = bidStats.productId
-        LEFT JOIN (
-            SELECT b1.productId, b1.price, b1.updatedAt
-            FROM bids b1
-            WHERE b1.price = (
-                SELECT MAX(b2.price) 
-                FROM bids b2 
-                WHERE b2.productId = b1.productId
-            )
-            LIMIT 1
-        ) AS highestBid ON product.id = highestBid.productId
-         WHERE product.userId ${req.url === "/all" ? "!=" : "="} ? AND (
-            highestBid.updatedAt IS NULL AND product.createdAt >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 24 HOUR)
-        ) OR (
-            highestBid.updatedAt >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 6 HOUR)
-        );`,
-      [req.session.user.id]
-    );
-
-    const products = rows.map((row) => ({
-      id: row.productId,
-      name: row.name,
-      price: row.initPrice,
-      createdAt: row.createdAt,
-      image: row.imageURL,
-      bidCount: row.bidCount,
-      highestBid: row.highestBid,
-      highestBidUpdatedAt: row.highestBidUpdatedAt,
-    }));
+    const products = await Product.getProducts(req.url === "/all", req.session.user.id)
     return res.status(200).json({ success: true, products: products });
   } catch (error) {
     console.log(error);
@@ -216,101 +169,12 @@ const getProductById = async (req, res) => {
       ...(req.session.viewedProducts || []),
       productId,
     ];
-    await Product.query(
-      `
-        UPDATE product 
-        SET views = views + 1 
-        WHERE id = ?
-      `,
-      [productId]
-    );
+    await Product.updateViewCount(productId);
   }
 
   try {
-    const [product] = await Product.query(
-      `SELECT 
-            p.id AS productId,
-            p.name,
-            p.description,
-            p.price AS initPrice,
-            p.condition,
-            p.views,
-            p.raise,
-            p.createdAt,
-
-            u.firstName,
-            u.lastName,
-            u.profileImageUrl,
-            u.phone,
-            u.verified,
-
-            COALESCE(img.imageURLs, '[]') AS images,
-            COALESCE(specs.specifications, '{}') AS specifications
-
-        FROM product p
-
-        LEFT JOIN user u ON p.userId = u.id
-
-        LEFT JOIN (
-            SELECT productId, JSON_ARRAYAGG(imageURL) AS imageURLs
-            FROM images
-            GROUP BY productId
-        ) AS img ON p.id = img.productId
-
-        LEFT JOIN (
-            SELECT 
-                s.categoryId, 
-                ps.productId, 
-                JSON_OBJECTAGG(s.name, COALESCE(ps.value, 'N/A')) AS specifications
-            FROM specifications s
-            LEFT JOIN productSpecifications ps 
-                ON s.id = ps.specificationId
-            GROUP BY ps.productId, s.categoryId
-        ) AS specs ON p.id = specs.productId AND p.categoryId = specs.categoryId
-
-        WHERE p.id = ?`,
-      [productId]
-    );
-
-    if (!product) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Product not found!" });
-    }
-
-    const bids = await Bids.query(
-      `SELECT 
-          b.price, b.createdAt,
-          u.id, u.firstName, u.lastName
-       FROM bids b
-       LEFT JOIN user u ON b.userId = u.id
-       WHERE b.productId = ?
-       ORDER BY b.price DESC`,
-      [productId]
-    );
-
-    const finalProduct = {
-      id: product.productId,
-      name: product.name,
-      description: product.description,
-      price: product.initPrice,
-      condition: product.condition,
-      views: product.views,
-      raise: product.raise,
-      images: JSON.parse(product.images),
-      createdAt: product.createdAt,
-      user: {
-        firstName: product.firstName,
-        lastName: product.lastName,
-        profileImageUrl: product.profileImageUrl + "?v=" + Date.now(),
-        phone: product.phone,
-        verified: product.verified,
-      },
-      specifications: JSON.parse(product.specifications),
-      bids,
-    };
-
-    return res.status(200).json({ success: true, product: finalProduct });
+    const product = await Product.getProductById(productId);
+    return res.status(200).json({ success: true, product: product });
   } catch (error) {
     console.log(error);
     res.status(500).json("Server Error");
@@ -320,109 +184,8 @@ const getProductById = async (req, res) => {
 
 const filterProducts = async (req, res) => {
   const { categories, price, endsIn, sortBy, lowToHigh } = req.body;
-
-  let query = `
-        SELECT 
-            product.id AS productId,
-            product.name,
-            COALESCE(highestBid.price, product.price) AS effectivePrice, 
-            product.createdAt,
-            (SELECT imageURL FROM images WHERE images.productId = product.id LIMIT 1) AS imageURL,
-            bidStats.bidCount,
-            highestBid.price AS highestBid,
-            highestBid.updatedAt AS highestBidUpdatedAt,
-            category.name AS categoryName,
-    
-            CASE 
-                WHEN highestBid.updatedAt IS NOT NULL 
-                THEN TIMESTAMPDIFF(MINUTE, NOW(), DATE_ADD(highestBid.updatedAt, INTERVAL 6 HOUR))
-                ELSE TIMESTAMPDIFF(MINUTE, NOW(), DATE_ADD(product.createdAt, INTERVAL 24 HOUR))
-            END AS remainingTime
-    
-        FROM product
-        LEFT JOIN category ON product.categoryId = category.id
-        LEFT JOIN (
-            SELECT productId, COUNT(id) AS bidCount
-            FROM bids
-            GROUP BY productId
-        ) AS bidStats ON product.id = bidStats.productId
-        LEFT JOIN (
-            SELECT b1.productId, b1.price, b1.updatedAt
-            FROM bids b1
-            WHERE b1.price = (
-                SELECT MAX(b2.price) 
-                FROM bids b2 
-                WHERE b2.productId = b1.productId
-            )
-            LIMIT 1
-        ) AS highestBid ON product.id = highestBid.productId
-        HAVING remainingTime > 0`;
-
-  const queryParams = [];
-
-  if (!categories.includes("All") && categories.length > 0) {
-    query += ` AND category.name IN (?)`;
-    queryParams.push(categories);
-  }
-
-  if (price.min) {
-    query += ` AND COALESCE(highestBid.price, product.price) >= ?`;
-    queryParams.push(price.min);
-  }
-  if (price.max) {
-    query += ` AND COALESCE(highestBid.price, product.price) <= ?`;
-    queryParams.push(price.max);
-  }
-
-  if (endsIn.min >= 0) {
-    query += ` AND (GREATEST(0,
-            CASE 
-                WHEN highestBid.updatedAt IS NOT NULL 
-                THEN TIMESTAMPDIFF(MINUTE, NOW(), DATE_ADD(highestBid.updatedAt, INTERVAL 6 HOUR))
-                ELSE TIMESTAMPDIFF(MINUTE, NOW(), DATE_ADD(product.createdAt, INTERVAL 24 HOUR))
-            END) >= ?
-        )`;
-    queryParams.push(endsIn.min * 60);
-  }
-  if (endsIn.max <= 24) {
-    query += ` AND (GREATEST(0,
-            CASE 
-                WHEN highestBid.updatedAt IS NOT NULL 
-                THEN TIMESTAMPDIFF(MINUTE, NOW(), DATE_ADD(highestBid.updatedAt, INTERVAL 6 HOUR))
-                ELSE TIMESTAMPDIFF(MINUTE, NOW(), DATE_ADD(product.createdAt, INTERVAL 24 HOUR))
-            END) <= ?
-        )`;
-    queryParams.push(endsIn.max * 60);
-  }
-
-  if (sortBy !== "None") {
-    let orderByColumn = "product.createdAt";
-    if (sortBy === "Price") {
-      orderByColumn = "effectivePrice";
-    } else if (sortBy === "Bids Placed") {
-      orderByColumn = "bidStats.bidCount";
-    } else if (sortBy === "Time Left") {
-      orderByColumn = "remainingTime";
-    }
-
-    query += ` ORDER BY ${orderByColumn} ${lowToHigh ? "ASC" : "DESC"}`;
-  } else {
-    query += ` ORDER BY product.createdAt ASC`;
-  }
-
   try {
-    const rows = await Product.query(query, queryParams);
-    const products = rows.map((row) => ({
-      id: row.productId,
-      name: row.name,
-      price: row.effectivePrice,
-      createdAt: row.createdAt,
-      image: row.imageURL,
-      bidCount: row.bidCount,
-      highestBid: row.highestBid,
-      highestBidUpdatedAt: row.highestBidUpdatedAt,
-      remainingTime: row.remainingTime,
-    }));
+    const products = await Product.filterProducts(categories, price, endsIn, sortBy, lowToHigh);
     return res.status(200).json({ success: true, products });
   } catch (error) {
     console.log(error);
@@ -433,10 +196,6 @@ const filterProducts = async (req, res) => {
 const save = async (req, res) => {
   const { itemId, save } = req.body;
   const userId = req.session.user.id;
-
-  if (!userId) {
-    return res.status(401).json({ error: "Unauthorized!" });
-  }
 
   if (!itemId || !Number.isInteger(Number(itemId)) || save === undefined) {
     return res.status(400).json({ error: "Bad Request!" });
@@ -461,56 +220,8 @@ const save = async (req, res) => {
 const getSaved = async (req, res) => {
   const userId = req.session.user.id;
 
-  if (!userId) {
-    return res.status(401).json({ error: "Unauthorized!" });
-  }
-
   try {
-    const rows = await Product.query(
-      `SELECT 
-            product.id AS productId,
-            product.name,
-            product.price as initPrice,
-            product.createdAt,
-            (SELECT imageURL FROM images WHERE images.productId = product.id LIMIT 1) AS imageURL,
-            bidStats.bidCount,
-            highestBid.price AS highestBid,
-            highestBid.updatedAt AS highestBidUpdatedAt
-        FROM product
-            RIGHT JOIN saved on product.id = saved.productId
-        LEFT JOIN (
-            SELECT productId, COUNT(id) AS bidCount
-            FROM bids
-            GROUP BY productId
-        ) AS bidStats ON product.id = bidStats.productId
-        LEFT JOIN (
-            SELECT b1.productId, b1.price, b1.updatedAt
-            FROM bids b1
-            WHERE b1.price = (
-                SELECT MAX(b2.price) 
-                FROM bids b2 
-                WHERE b2.productId = b1.productId
-            )
-            LIMIT 1
-        ) AS highestBid ON product.id = highestBid.productId
-        WHERE saved.userId = ? AND (
-            highestBid.updatedAt IS NULL AND product.createdAt >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 24 HOUR)
-        ) OR (
-            highestBid.updatedAt >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 6 HOUR)
-        );`,
-      [userId]
-    );
-
-    const products = rows.map((row) => ({
-      id: row.productId,
-      name: row.name,
-      price: row.initPrice,
-      createdAt: row.createdAt,
-      image: row.imageURL,
-      bidCount: row.bidCount,
-      highestBid: row.highestBid,
-      highestBidUpdatedAt: row.highestBidUpdatedAt,
-    }));
+    const products = await Product.getSaved(userId);
     return res.status(200).json({ success: true, products: products });
   } catch (error) {
     console.log(error);

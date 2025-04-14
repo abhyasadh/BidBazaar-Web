@@ -6,6 +6,7 @@ const UserContext = createContext();
 
 export const UserProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [csrfToken, setCsrfToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -16,6 +17,7 @@ export const UserProvider = ({ children }) => {
           setUser(response.data.user);
           connectSocket(response.data.user.id);
         }
+        setCsrfToken(response.data.csrfToken);
       } catch (error) {
         console.log("No active session.");
       } finally {
@@ -27,7 +29,7 @@ export const UserProvider = ({ children }) => {
   }, []);
 
   return (
-    <UserContext.Provider value={{ user, loading, setUser }}>
+    <UserContext.Provider value={{ user, csrfToken, loading, setUser }}>
       {children}
     </UserContext.Provider>
   );

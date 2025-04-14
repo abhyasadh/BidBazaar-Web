@@ -2,28 +2,20 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Share, Flag } from "iconsax-react";
 import { useFunctions } from "../../../contexts/CommonFunctions";
-import useProductObserver from "../../../hooks/productObserver";
 import SaveButton from "./SaveButton";
 import { useShareReportModal } from "../context/ShareAndReportContext";
-import { getSocket } from "../../../APIs/socket";
+import { useItems } from "../context/ItemsContext";
+import TimeDisplay from "../components/TimeDisplay";
 
-const Item = ({
-  itemId,
-  imageLink,
-  title,
-  price,
-  bidCount,
-  endsIn,
-  previewMode = false,
-}) => {
+const Item = ({ itemId, previewMode = false }) => {
   const navigate = useNavigate();
-  const socket = getSocket();
+
+  const { products } = useItems();
+  const product = products?.find((p) => p.id === itemId);
 
   const [showDropdown, setShowDropdown] = useState(false);
   const { openReportModal, openShareModal } = useShareReportModal();
   const dropdownRef = useRef(null);
-
-  const ref = useProductObserver(itemId, socket);
 
   const handleClickOutside = (event) => {
     if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -41,10 +33,6 @@ const Item = ({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showDropdown]);
-
-  const [liveBidCount, setLiveBidCount] = useState(bidCount);
-  const [livePrice, setLivePrice] = useState(price);
-  const [liveEndsIn, setLiveEndsIn] = useState(endsIn);
 
   const style = {
     outerContainer: {
@@ -136,47 +124,38 @@ const Item = ({
     },
   };
 
-  const { formatDuration, generateSlug } = useFunctions();
-
-  useEffect(() => {
-    const updateHandler = (data) => {
-
-      if (String(data.productId) === String(itemId)) {
-        setLiveBidCount(data.bids.length);
-        setLivePrice(data.bids[0].price);
-        setLiveEndsIn(new Date(data.bids[0].createdAt).getTime() + 21600000);
-      }
-    };
-
-    socket.on("bid-update", updateHandler);
-
-    return () => {
-      socket.off("bid-update", updateHandler);
-    };
-  }, [itemId, socket]);
+  const { generateSlug } = useFunctions();
 
   return (
     <div
       style={style.outerContainer}
       onClick={() => {
         if (previewMode) return;
-        navigate(`/item/${itemId}/${generateSlug(title)}`);
-        document.title = "BidBazaar - " + title;
+        console.log(product);
+        navigate(`/item/${itemId}/${generateSlug(product.name)}`);
+        document.title = "BidBazaar - " + product.name;
       }}
       className="item"
-      ref={ref}
     >
       <div style={style.imageContainer}>
-        <img src={imageLink} alt={title} style={style.itemImage} />
+        <img src={product.image} alt={product.name} style={style.itemImage} />
         <div style={style.bidCountContainer}>
-          Bid Count: {liveBidCount.toLocaleString()}
+          Bid Count: {product.bidCount ? product.bidCount.toLocaleString() : 0}
         </div>
-        <div style={style.timeContainer}>{formatDuration(liveEndsIn)}</div>
+        <div style={style.timeContainer}>
+          <TimeDisplay
+            timestamp={
+              product.highestBidUpdatedAt
+                ? new Date(product.highestBidUpdatedAt).getTime() + 21600000
+                : new Date(product.createdAt).getTime() + 21600000 * 4
+            }
+          />
+        </div>
       </div>
       <div style={style.detailsContainer}>
         <div style={style.titleContainer}>
-          <span style={style.title}>{title}</span>
-          <span style={style.price}>Rs. {livePrice.toLocaleString()}</span>
+          <span style={style.title}>{product.name}</span>
+          <span style={style.price}>Rs. {product.price.toLocaleString()}</span>
         </div>
         <div style={style.actionsContainer}>
           <div style={{ position: "relative" }}>
@@ -228,7 +207,12 @@ const Item = ({
               >
                 <div
                   onClick={() => {
-                    openShareModal({ itemId, imageLink, title, price });
+                    openShareModal({
+                      itemId: itemId,
+                      imageLink: product.image,
+                      title: product.name,
+                      price: product.price,
+                    });
                   }}
                   className="custom-dropdown-item"
                   style={{
@@ -252,7 +236,12 @@ const Item = ({
                 />
                 <div
                   onClick={() => {
-                    openReportModal({ itemId, imageLink, title, price });
+                    openReportModal({
+                      itemId: itemId,
+                      imageLink: product.image,
+                      title: product.name,
+                      price: product.price,
+                    });
                   }}
                   className="custom-dropdown-item"
                   style={{
