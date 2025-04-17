@@ -1,12 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useFilter } from "../context/FilterContext";
 import { apis, useProtectedApi } from "../../../APIs/api";
-import { toast } from "react-toastify";
-import Item from "../components/Item";
 import { useLocation } from "react-router-dom";
 import { useItems } from "../context/ItemsContext";
-import ItemLoader from "../components/ItemLoader";
 import Empty from "../components/Empty";
+import InfiniteProducts from "../components/InfiniteProducts";
 
 const FilteredItems = () => {
   const location = useLocation();
@@ -63,17 +61,7 @@ const FilteredItems = () => {
   const [filteredProducts, setFilteredProducts] = useState(null);
   const { protectedPost } = useProtectedApi();
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const res = await protectedPost(apis.getFilteredProducts, filter);
-        setAllProducts(res.data.products);
-      } catch (error) {
-        toast.error(error.message);
-      }
-    };
-    fetchProducts();
-  }, [protectedPost, filter]);
+  const [offset, setOffset] = useState(0);
 
   useEffect(() => {
     const currentPage = location.pathname;
@@ -87,6 +75,15 @@ const FilteredItems = () => {
       setFilteredProducts(allProducts);
     }
   }, [location.pathname, allProducts, saved]);
+
+  const fetchFunction = useCallback(
+    ({ limit, offset }) =>
+      protectedPost(
+        `${apis.getFilteredProducts}?limit=${limit}&offset=${offset}`,
+        filter
+      ),
+    [protectedPost, filter]
+  );
 
   return (
     <div className="user-dashboard">
@@ -146,34 +143,16 @@ const FilteredItems = () => {
       </div>
       <h2 className="label">Filtered Items</h2>
       {filteredProducts && filteredProducts.length === 0 ? (
-        <Empty height={"100%"}/>
+        <Empty height={"100%"} />
       ) : (
-        <div className="items-container">
-          {filteredProducts === null ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} style={{ width: "100%", aspectRatio: "1" }}>
-                <ItemLoader />
-              </div>
-            ))
-          ) : (
-            filteredProducts.map((product) => (
-              <Item
-                key={product.id}
-                itemId={product.id}
-                imageLink={product.image}
-                title={product.name}
-                price={product.highestBid ?? product.price}
-                bidCount={product.bidCount ?? 0}
-                endsIn={
-                  product.highestBidUpdatedAt
-                    ? new Date(product.highestBidUpdatedAt).getTime() + 21600000
-                    : new Date(product.createdAt).getTime() + 21600000 * 4
-                }
-              />
-            ))
-          )}
-          ;
-        </div>
+        <InfiniteProducts
+          shimmerCount={4}
+          products={filteredProducts}
+          setProducts={setAllProducts}
+          offset={offset}
+          setOffset={setOffset}
+          fetchFunction={fetchFunction}
+        />
       )}
     </div>
   );

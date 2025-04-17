@@ -1,12 +1,20 @@
-import React from "react";
-import Item from "../components/Item";
+import React, { useCallback, useState } from "react";
 import ContentLoader from "react-content-loader";
-import ItemLoader from "../components/ItemLoader";
 import Empty from "../components/Empty";
 import { useItems } from "../context/ItemsContext";
+import { apis, useProtectedApi } from "../../../APIs/api";
+import InfiniteProducts from "../components/InfiniteProducts";
 
 const Default = () => {
-  const { products } = useItems();
+  const { products, setProducts } = useItems();
+  const [offset, setOffset] = useState(0);
+  const { protectedGet } = useProtectedApi();
+
+  const fetchFunction = useCallback(
+    ({ limit, offset }) =>
+      protectedGet(`${apis.getProducts}?limit=${limit}&offset=${offset}`),
+    [protectedGet]
+  );
 
   return (
     <>
@@ -24,35 +32,17 @@ const Default = () => {
           </ContentLoader>
         </div>
       ) : products.length === 0 ? (
-        <Empty height={"calc(100vh - 122px)"}/>
+        <Empty height={"calc(100vh - 122px)"} />
       ) : (
-        products && products.length > 0 && <h2 className="label">Trending</h2>
+        products && products.length > 0 && <h2 className="label">Ending Soon</h2>
       )}
-      <div className="items-container">
-        {products === null ? (
-          Array.from({ length: 24 }).map((_, index) => (
-            <div key={index} style={{ width: "100%", aspectRatio: "1" }}>
-              <ItemLoader key={index} />
-            </div>
-          ))
-        ) : (
-          products.map((product) => (
-            <Item
-              key={product.id}
-              itemId={product.id}
-              imageLink={product.image}
-              title={product.name}
-              price={product.highestBid ?? product.price}
-              bidCount={product.bidCount ?? 0}
-              endsIn={
-                product.highestBidUpdatedAt
-                  ? new Date(product.highestBidUpdatedAt).getTime() + 21600000
-                  : new Date(product.createdAt).getTime() + 21600000 * 4
-              }
-            />
-          ))
-        )}
-      </div>
+      <InfiniteProducts
+        products={products}
+        setProducts={setProducts}
+        offset={offset}
+        setOffset={setOffset}
+        fetchFunction={fetchFunction}
+      />
     </>
   );
 };

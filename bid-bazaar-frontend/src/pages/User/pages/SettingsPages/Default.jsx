@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { useProtectedApi, apis } from "../../../../APIs/api";
 import { useUser } from "../../../../contexts/UserContext";
 import { useNavigate } from "react-router-dom";
@@ -7,12 +7,10 @@ import { useTheme } from "../../../../contexts/ThemeContext";
 import {
   ArrowRight2,
   DocumentText1,
-  InfoCircle,
   Judge,
   Logout,
   MessageQuestion,
   Moon,
-  NotificationBing,
   PasswordCheck,
   Sms,
 } from "iconsax-react";
@@ -26,10 +24,6 @@ const Default = () => {
   const { protectedPost } = useProtectedApi();
   const { theme, toggleTheme } = useTheme();
   const { setUser } = useUser();
-
-  const [notification, setNotification] = useState(
-    Notification.permission === "default"
-  );
 
   const SettingsButton = React.memo(
     ({
@@ -241,65 +235,6 @@ const Default = () => {
           </button>
         }
       />
-
-      {notification ? (
-        <SettingsButton
-          style={{ cursor: "default" }}
-          icon={<NotificationBing color="var(--primary-color)" size={30} />}
-          title="Notifications"
-          description="Receive alerts and updates about your auctions."
-          endButton={
-            <button
-              onClick={async () => {
-                if (!("Notification" in window)) {
-                  alert("Browser does not support notifications!");
-                } else if (Notification.permission !== "denied") {
-                  await Notification.requestPermission().then((permission) => {
-                    setNotification(permission === "default");
-                  });
-                }
-              }}
-              style={{
-                width: "48px",
-                height: "28px",
-                padding: "0",
-                borderRadius: "15px",
-                border: `2px solid var(--text-color)`,
-                backgroundColor: "var(--color-scheme-secondary)",
-                display: "flex",
-                alignItems: "center",
-                position: "relative",
-                cursor: "pointer",
-                transition: "background-color 0.3s ease",
-              }}
-            >
-              <div
-                style={{
-                  width: "20px",
-                  height: "20px",
-                  borderRadius: "50%",
-                  backgroundColor: "var(--text-color)",
-                  position: "absolute",
-                  left: "2px",
-                  transition: "left 0.8s ease-in-out",
-                }}
-              ></div>
-            </button>
-          }
-        />
-      ) : (
-        <div className="info">
-          <InfoCircle size={24} color="#ff6c44" style={{ width: "50px" }} />
-          <p style={{ fontSize: "16px" }}>
-            Notifications are{" "}
-            {Notification.permission === "granted" ? "enabled" : "disabled"}.
-            You can{" "}
-            {Notification.permission === "granted" ? "disable" : "enable"} them
-            in your browser settings.
-          </p>
-        </div>
-      )}
-
       <hr
         style={{
           padding: "0px",

@@ -6,37 +6,61 @@ class Product extends SQLModel {
     super("Product");
   }
 
-  async getProducts(all, id) {
+  async getProducts(all, id, limit, offset) {
     const rows = await this.query(
       `SELECT 
-            product.id AS productId,
-            product.name,
-            product.price as initPrice,
-            product.createdAt,
-            (SELECT imageURL FROM images WHERE images.productId = product.id LIMIT 1) AS imageURL,
-            bidStats.bidCount,
-            highestBid.price AS highestBid,
-            highestBid.updatedAt AS highestBidUpdatedAt
+          product.id AS productId,
+          product.name,
+          product.price as initPrice,
+          product.createdAt,
+          (SELECT imageURL FROM images WHERE images.productId = product.id LIMIT 1) AS imageURL,
+          bidStats.bidCount,
+          highestBid.price AS highestBid,
+          highestBid.updatedAt AS highestBidUpdatedAt,
+
+          CASE 
+            WHEN highestBid.updatedAt IS NOT NULL THEN DATE_ADD(highestBid.updatedAt, INTERVAL 6 HOUR)
+            ELSE DATE_ADD(product.createdAt, INTERVAL 24 HOUR)
+          END AS endingTime
+
         FROM product
+
         LEFT JOIN (
-            SELECT productId, COUNT(id) AS bidCount
+          SELECT productId, COUNT(id) AS bidCount
+          FROM bids
+          GROUP BY productId
+        ) AS bidStats ON product.id = bidStats.productId
+
+        LEFT JOIN (
+          SELECT b1.productId, b1.price, b1.updatedAt
+          FROM bids b1
+          INNER JOIN (
+            SELECT productId, MAX(price) AS maxPrice
             FROM bids
             GROUP BY productId
-        ) AS bidStats ON product.id = bidStats.productId
-        LEFT JOIN (
-            SELECT b1.productId, b1.price, b1.updatedAt
-            FROM bids b1
-            INNER JOIN (
-                SELECT productId, MAX(price) AS maxPrice
-                FROM bids
-                GROUP BY productId
-            ) b2 ON b1.productId = b2.productId AND b1.price = b2.maxPrice
+          ) b2 ON b1.productId = b2.productId AND b1.price = b2.maxPrice
         ) AS highestBid ON product.id = highestBid.productId
+
         WHERE product.userId ${
           all
-            ? "!= ? AND (highestBid.updatedAt IS NULL AND product.createdAt >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 24 HOUR)) OR (highestBid.updatedAt >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 6 HOUR));"
-            : "= ?;"
-        }`,
+            ? `!= ? AND (
+                  (highestBid.updatedAt IS NULL AND product.createdAt >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 24 HOUR))
+                  OR (highestBid.updatedAt >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 6 HOUR))
+                )`
+            : "= ?"
+        }
+
+        ORDER BY
+          CASE 
+            WHEN 
+              (highestBid.updatedAt IS NOT NULL AND DATE_ADD(highestBid.updatedAt, INTERVAL 6 HOUR) < NOW()) OR 
+              (highestBid.updatedAt IS NULL AND DATE_ADD(product.createdAt, INTERVAL 24 HOUR) < NOW())
+            THEN 1 ELSE 0
+          END ASC,
+          endingTime ASC
+
+        LIMIT ${limit} OFFSET ${offset * limit};
+        `,
       [id]
     );
 
@@ -141,7 +165,15 @@ class Product extends SQLModel {
     );
   }
 
-  async filterProducts(categories, price, endsIn, sortBy, lowToHigh) {
+  async filterProducts(
+    categories,
+    price,
+    endsIn,
+    sortBy,
+    lowToHigh,
+    limit,
+    offset
+  ) {
     let query = `
         SELECT 
             product.id AS productId,
@@ -231,6 +263,8 @@ class Product extends SQLModel {
       query += ` ORDER BY product.createdAt ASC`;
     }
 
+    query += ` LIMIT ${limit} OFFSET ${limit * offset};`;
+
     const rows = await this.query(query, queryParams);
     const products = rows.map((row) => ({
       id: row.productId,
@@ -294,6 +328,74 @@ class Product extends SQLModel {
     }));
 
     return products;
+  }
+
+  async getBidProducts(userId) {
+    const rows = await this.query(
+      `SELECT 
+          p.id AS productId,
+          p.name,
+          p.price AS initPrice,
+          p.createdAt,
+          (SELECT imageURL FROM images WHERE productId = p.id LIMIT 1) AS imageURL,
+          bidStats.bidCount,
+          hb.price AS highestBid,
+          hb.updatedAt AS highestBidUpdatedAt,
+          bid.price AS bidPrice,
+          userRank.rank AS position,
+          CASE 
+            WHEN hb.updatedAt IS NOT NULL THEN DATE_ADD(hb.updatedAt, INTERVAL 6 HOUR)
+            ELSE DATE_ADD(p.createdAt, INTERVAL 24 HOUR)
+          END AS endingTime
+
+        FROM product p
+        JOIN (
+          SELECT productId, MAX(price) AS price
+          FROM bids
+          WHERE userId = 2
+          GROUP BY productId
+        ) AS bid ON p.id = bid.productId
+
+        LEFT JOIN (
+          SELECT productId, COUNT(*) AS bidCount
+          FROM bids
+          GROUP BY productId
+        ) AS bidStats ON p.id = bidStats.productId
+
+        LEFT JOIN (
+          SELECT b1.productId, b1.price, b1.updatedAt
+          FROM bids b1
+          INNER JOIN (
+            SELECT productId, MAX(price) AS maxPrice
+            FROM bids
+            GROUP BY productId
+          ) b2 ON b1.productId = b2.productId AND b1.price = b2.maxPrice
+        ) AS hb ON p.id = hb.productId
+        JOIN (
+          SELECT 
+            productId,
+            userId,
+            price,
+            RANK() OVER (PARTITION BY productId ORDER BY price DESC) AS "rank"
+          FROM bids
+        ) AS userRank ON userRank.productId = p.id AND userRank.userId = 2
+        WHERE (
+          (
+            (hb.updatedAt IS NOT NULL AND DATE_ADD(hb.updatedAt, INTERVAL 6 HOUR) > NOW()) OR
+            (hb.updatedAt IS NULL AND DATE_ADD(p.createdAt, INTERVAL 24 HOUR) > NOW())
+          )
+          OR
+          (
+            userRank.rank = 1 AND
+            (
+              (hb.updatedAt IS NOT NULL AND DATE_ADD(hb.updatedAt, INTERVAL 6 HOUR) >= DATE_SUB(NOW(), INTERVAL 7 DAY)) OR
+              (hb.updatedAt IS NULL AND DATE_ADD(p.createdAt, INTERVAL 24 HOUR) >= DATE_SUB(NOW(), INTERVAL 7 DAY))
+            )
+          )
+        )
+        ORDER BY userRank.rank ASC, endingTime ASC;`,
+      [userId]
+    );
   }
 }
 

@@ -10,7 +10,6 @@ function socketHandler(io) {
     });
 
     socket.on("join-room", (productId) => {
-      console.log("User joined room:", productId);
       socket.join(String(productId));
     });
 

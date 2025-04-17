@@ -4,14 +4,18 @@ import { Share, Flag } from "iconsax-react";
 import { useFunctions } from "../../../contexts/CommonFunctions";
 import SaveButton from "./SaveButton";
 import { useShareReportModal } from "../context/ShareAndReportContext";
-import { useItems } from "../context/ItemsContext";
 import TimeDisplay from "../components/TimeDisplay";
 
-const Item = ({ itemId, previewMode = false }) => {
+const Item = ({
+  itemId,
+  imageLink,
+  title,
+  price,
+  bidCount,
+  endsIn,
+  previewMode = false,
+}) => {
   const navigate = useNavigate();
-
-  const { products } = useItems();
-  const product = products?.find((p) => p.id === itemId);
 
   const [showDropdown, setShowDropdown] = useState(false);
   const { openReportModal, openShareModal } = useShareReportModal();
@@ -131,31 +135,24 @@ const Item = ({ itemId, previewMode = false }) => {
       style={style.outerContainer}
       onClick={() => {
         if (previewMode) return;
-        console.log(product);
-        navigate(`/item/${itemId}/${generateSlug(product.name)}`);
-        document.title = "BidBazaar - " + product.name;
+        navigate(`/item/${itemId}/${generateSlug(title)}`);
+        document.title = "BidBazaar - " + title;
       }}
       className="item"
     >
       <div style={style.imageContainer}>
-        <img src={product.image} alt={product.name} style={style.itemImage} />
+        <img src={imageLink} alt={title} style={style.itemImage} />
         <div style={style.bidCountContainer}>
-          Bid Count: {product.bidCount ? product.bidCount.toLocaleString() : 0}
+          Bid Count: {bidCount.toLocaleString()}
         </div>
         <div style={style.timeContainer}>
-          <TimeDisplay
-            timestamp={
-              product.highestBidUpdatedAt
-                ? new Date(product.highestBidUpdatedAt).getTime() + 21600000
-                : new Date(product.createdAt).getTime() + 21600000 * 4
-            }
-          />
+          <TimeDisplay timestamp={endsIn} />
         </div>
       </div>
       <div style={style.detailsContainer}>
         <div style={style.titleContainer}>
-          <span style={style.title}>{product.name}</span>
-          <span style={style.price}>Rs. {product.price.toLocaleString()}</span>
+          <span style={style.title}>{title}</span>
+          <span style={style.price}>Rs. {price.toLocaleString()}</span>
         </div>
         <div style={style.actionsContainer}>
           <div style={{ position: "relative" }}>
@@ -209,9 +206,9 @@ const Item = ({ itemId, previewMode = false }) => {
                   onClick={() => {
                     openShareModal({
                       itemId: itemId,
-                      imageLink: product.image,
-                      title: product.name,
-                      price: product.price,
+                      imageLink: imageLink,
+                      title: title,
+                      price: price,
                     });
                   }}
                   className="custom-dropdown-item"
@@ -238,9 +235,9 @@ const Item = ({ itemId, previewMode = false }) => {
                   onClick={() => {
                     openReportModal({
                       itemId: itemId,
-                      imageLink: product.image,
-                      title: product.name,
-                      price: product.price,
+                      imageLink: imageLink,
+                      title: title,
+                      price: price,
                     });
                   }}
                   className="custom-dropdown-item"

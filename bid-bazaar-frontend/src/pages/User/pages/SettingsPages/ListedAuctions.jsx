@@ -1,54 +1,62 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { apis, useProtectedApi } from "../../../../APIs/api";
-import { toast } from "react-toastify";
-import Item from "../../components/Item";
-import ItemLoader from "../../components/ItemLoader";
-import { useFunctions } from "../../../../contexts/CommonFunctions";
-import ContentLoader from "react-content-loader";
 import Empty from "../../components/Empty";
+import InfiniteProducts from "../../components/InfiniteProducts";
+import ItemLoader from "../../components/ItemLoader";
+import ContentLoader from "react-content-loader";
 
 const ListedAuctions = () => {
-  const { formatDuration } = useFunctions();
   const { protectedGet } = useProtectedApi();
 
   const [products, setProducts] = useState(null);
   const [active, setActive] = useState([]);
   const [ended, setEnded] = useState([]);
 
+  const [offset, setOffset] = useState(0);
+
+  const fetchFunction = useCallback(
+    ({ limit, offset }) =>
+      protectedGet(`${apis.getOwnProducts}?limit=${limit}&offset=${offset}`),
+    [protectedGet]
+  );
+
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchInitialProducts = async () => {
       try {
-        const res = await protectedGet(apis.getOwnProducts);
-        const allProducts = res.data.products;
-        setProducts(allProducts);
+        const res = await fetchFunction({ limit: 24, offset: 0 });
+        const newProducts = res.data.products;
+
+        setProducts(newProducts);
+        setOffset(1);
       } catch (error) {
-        toast.error("Failed to fetch your listed auctions!");
+        console.error("Error fetching products:", error);
       }
     };
 
-    fetchProducts();
-  }, [protectedGet]);
+    fetchInitialProducts();
+  }, [fetchFunction, setProducts, setOffset]);
 
   useEffect(() => {
+    if (!products) return;
+
     const newActive = [];
     const newEnded = [];
 
-    products && products.forEach((product) => {
-      const time = formatDuration(
-        product.highestBidUpdatedAt
-          ? new Date(product.highestBidUpdatedAt).getTime() + 21600000
-          : new Date(product.createdAt).getTime() + 21600000 * 4
-      );
+    products.forEach((product) => {
+      const bidEnd = product.highestBidUpdatedAt
+        ? new Date(product.highestBidUpdatedAt).getTime() + 21600000
+        : new Date(product.createdAt).getTime() + 21600000 * 4;
 
-      if (time.startsWith("Ended")) {
-        newEnded.push(product);
-      } else {
+      if (bidEnd > Date.now()) {
         newActive.push(product);
+      } else {
+        newEnded.push(product);
       }
     });
+
     setActive(newActive);
     setEnded(newEnded);
-  }, [formatDuration, products]);
+  }, [products]);
 
   if (products === null) {
     return (
@@ -67,9 +75,9 @@ const ListedAuctions = () => {
           </ContentLoader>
         </div>
         <div className="items-container">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} style={{ width: "100%", aspectRatio: "1" }}>
-              <ItemLoader />
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} style={{ width: "100%", aspectRatio: "1" }}>
+              <ItemLoader key={index} />
             </div>
           ))}
         </div>
@@ -77,7 +85,7 @@ const ListedAuctions = () => {
     );
   }
 
-  if (products.length === 0) {
+  if (products && products.length === 0) {
     return <Empty height={"calc(100vh - 50px)"} />;
   }
 
@@ -87,26 +95,15 @@ const ListedAuctions = () => {
       {active.length > 0 && (
         <>
           <h2 className="label">Active</h2>
-          <div className="items-container">
-            {active.map((product) => (
-              <Item
-                key={product.id}
-                itemId={product.id}
-                imageLink={product.image}
-                title={product.name}
-                price={product.highestBid ?? product.price}
-                bidCount={product.bidCount ?? 0}
-                endsIn={
-                  product.highestBidUpdatedAt
-                    ? new Date(product.highestBidUpdatedAt).getTime() + 21600000
-                    : new Date(product.createdAt).getTime() + 21600000 * 4
-                }
-              />
-            ))}
-          </div>
+          <InfiniteProducts
+            products={active}
+            setProducts={setProducts}
+            offset={offset}
+            setOffset={setOffset}
+            fetchFunction={fetchFunction}
+          />
         </>
       )}
-
       {active.length > 0 && ended.length > 0 && (
         <hr
           style={{
@@ -119,27 +116,16 @@ const ListedAuctions = () => {
           }}
         />
       )}
-
       {ended.length > 0 && (
         <>
           <h2 className="label">Ended</h2>
-          <div className="items-container">
-            {ended.map((product) => (
-              <Item
-                key={product.id}
-                itemId={product.id}
-                imageLink={product.image}
-                title={product.name}
-                price={product.highestBid ?? product.price}
-                bidCount={product.bidCount ?? 0}
-                endsIn={
-                  product.highestBidUpdatedAt
-                    ? new Date(product.highestBidUpdatedAt).getTime() + 21600000
-                    : new Date(product.createdAt).getTime() + 21600000 * 4
-                }
-              />
-            ))}
-          </div>
+          <InfiniteProducts
+            products={ended}
+            setProducts={setProducts}
+            offset={offset}
+            setOffset={setOffset}
+            fetchFunction={fetchFunction}
+          />
         </>
       )}
     </>

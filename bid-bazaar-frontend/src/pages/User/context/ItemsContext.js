@@ -19,21 +19,6 @@ export const ItemsProvider = ({ children }) => {
   const joinedRooms = useMemo(() => new Set(), []);
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const res = await protectedGet(apis.getProducts);
-        setProducts(res.data.products);
-        res.data.products.forEach((element) => {
-          if (!joinedRooms.has(element.id)) {
-            socket.emit("join-room", element.id);
-            joinedRooms.add(element.id);
-          }
-        });
-      } catch (error) {
-        toast.error("Failed to fetch products!");
-      }
-    };
-
     const fetchCategories = async () => {
       try {
         const res = await protectedGet(apis.getCategories);
@@ -45,7 +30,6 @@ export const ItemsProvider = ({ children }) => {
     };
 
     if (user !== null) {
-      fetchProducts();
       fetchCategories();
     }
   }, [protectedGet, setCategories, user, socket, joinedRooms]);
@@ -80,31 +64,48 @@ export const ItemsProvider = ({ children }) => {
       setProducts((prev) =>
         prev?.map((item) =>
           String(item.id) === String(data.productId)
-            ? { ...item, bidCount: data.bids.length, price: data.bids[0].price, highestBidUpdatedAt: new Date(data.bids[0].createdAt) }
+            ? {
+                ...item,
+                bidCount: data.bids.length,
+                price: data.bids[0].price,
+                highestBidUpdatedAt: new Date(data.bids[0].createdAt),
+              }
             : item
         )
       );
-  
+
       setSaved((prev) =>
         prev?.map((item) =>
           String(item.id) === String(data.productId)
-            ? { ...item, bidCount: data.bids.length, price: data.bids[0].price, highestBidUpdatedAt: new Date(data.bids[0].createdAt) }
+            ? {
+                ...item,
+                bidCount: data.bids.length,
+                price: data.bids[0].price,
+                highestBidUpdatedAt: new Date(data.bids[0].createdAt),
+              }
             : item
         )
       );
     };
-  
+
     socket.on("bid-update", updateHandler);
-  
+
     return () => {
       socket.off("bid-update", updateHandler);
     };
   }, [socket]);
-  
 
   return (
     <ItemsContext.Provider
-      value={{ saved, products, categories, unsave, setUpdate }}
+      value={{
+        saved,
+        products,
+        setProducts,
+        joinedRooms,
+        categories,
+        unsave,
+        setUpdate,
+      }}
     >
       {children}
     </ItemsContext.Provider>

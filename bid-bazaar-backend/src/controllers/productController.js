@@ -2,9 +2,11 @@ const fs = require("fs");
 const { specificationList } = require("./categoryController");
 const fileType = import("file-type");
 const cloudinary = require("cloudinary");
-const { Product } = require("../services/productServices");
+const { Product } = require("../services/ProductServices");
 const { Images } = require("../services/imageServices");
-const { ProductSpecifications } = require("../services/productSpecificationServices");
+const {
+  ProductSpecifications,
+} = require("../services/productSpecificationServices");
 const { Saved } = require("../services/savedServices");
 
 const productPost = async (req, res) => {
@@ -145,8 +147,14 @@ const productPost = async (req, res) => {
 };
 
 const getProducts = async (req, res) => {
+  const { limit, offset } = req.query;
   try {
-    const products = await Product.getProducts(req.url === "/all", req.session.user.id)
+    const products = await Product.getProducts(
+      req.url.startsWith("/all"),
+      req.session.user.id,
+      limit,
+      offset
+    );
     return res.status(200).json({ success: true, products: products });
   } catch (error) {
     console.log(error);
@@ -184,8 +192,17 @@ const getProductById = async (req, res) => {
 
 const filterProducts = async (req, res) => {
   const { categories, price, endsIn, sortBy, lowToHigh } = req.body;
+  const { limit, offset } = req.query;
   try {
-    const products = await Product.filterProducts(categories, price, endsIn, sortBy, lowToHigh);
+    const products = await Product.filterProducts(
+      categories,
+      price,
+      endsIn,
+      sortBy,
+      lowToHigh,
+      limit,
+      offset,
+    );
     return res.status(200).json({ success: true, products });
   } catch (error) {
     console.log(error);
@@ -219,6 +236,7 @@ const save = async (req, res) => {
 
 const getSaved = async (req, res) => {
   const userId = req.session.user.id;
+  const { limit, offset } = req.query;
 
   try {
     const products = await Product.getSaved(userId);

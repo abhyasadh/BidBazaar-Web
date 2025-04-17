@@ -39,7 +39,7 @@ const Saved = () => {
   }
 
   if (saved.length === 0) {
-    return <Empty height={"calc(100vh - 122px)"}/>
+    return <Empty height={"calc(100vh - 122px)"} />;
   }
 
   return (
